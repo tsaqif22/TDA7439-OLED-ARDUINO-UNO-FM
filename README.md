@@ -1,6 +1,5 @@
 # TDA7439-OLED-ARDUINO-UNO-FM
 
-
 HARDWARE:
 
 Tone controller TDA7439. 
