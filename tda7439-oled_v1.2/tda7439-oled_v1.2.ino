@@ -38,7 +38,7 @@ void setup() {
 
   EEPROM_readAnything(0, configuration);
   
-  if(configuration.attLevel != 0 ){
+  if(configuration.attLevel != 0){
     configuration.activeInput   = 4;
     configuration.volumeLevel   = 3;
     configuration.bassLevel     = 2;
@@ -99,7 +99,7 @@ void loop(){
   if(irrecv.decode(&results)){
     if(results.decode_type == NEC){
       process_ir(results.value);
-      delay(50);
+      //delay(50);
     }
     irrecv.resume(); // Receive the next value
   }
@@ -234,6 +234,8 @@ void process_ir(unsigned long ir_command){
         if(ir_command == CA_KEY_NINE)   configuration.frequency = configuration.station_9;
         Radio.set_frequency(configuration.frequency);
         EEPROM_writeAnything(0, configuration);
+        lastChange = 0;
+        oled_display = true;
       }
       break;
     
