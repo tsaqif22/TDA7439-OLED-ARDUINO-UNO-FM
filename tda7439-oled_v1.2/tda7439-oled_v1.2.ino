@@ -9,16 +9,19 @@
 #define NEC
 #include <IRremote.h>
 #include <SSD1306_text.h>
+#include <DS3232RTC.h>
 #include "remote.h"
 
 ClickEncoder *encoder;
 int16_t encoder_last_value, encoder_current_value;
 
 unsigned long lastChange = 0;
+unsigned long rtc_timer = 0;
 unsigned int current_menu = DEFAULT_MENU;
 boolean mute = false;
 boolean save_station = false;
 unsigned long last_ir_command;
+tmElements_t my_time;
 
 #define encResDivider 100
 void timerIsr() { encoder->service(); }
@@ -69,9 +72,6 @@ void setup() {
 
   oled.init(); oled.clear();
   oled.setTextTransparent(false);
-  oled.setCursor(0,4);
-  oled.setTextSize(2);
-  oled.print("TDA7439 EQ");
 
   equ.setInput(configuration.activeInput);
   equ.inputGain(configuration.gainLevel);
@@ -131,6 +131,35 @@ void loop(){
   }    
 
   unsigned long currentMillis = millis();
+
+  if(currentMillis - rtc_timer >= 60000 || rtc_timer == 0){
+    RTC.read(my_time);
+
+    oled.setCursor(0, 4);
+    oled.setTextSize(2, 4);
+
+    char foo_date[2];
+    sprintf(foo_date, "%02d", my_time.Day);
+    oled.print(foo_date);
+    oled.setTextSize(1,2);
+    oled.setCursor(0, 39);
+    oled.print(months[my_time.Month-1]);
+    oled.setCursor(1,32);
+    oled.print(my_time.Year+1970);
+
+    char foo_time[5];
+    sprintf(foo_time, "%02d:%02d", my_time.Hour, my_time.Minute);
+    oled.setTextSize(2, 4);
+    oled.setCursor(0, 65);
+    oled.print(foo_time);
+
+    oled.setTextSize(1, 2);
+    oled.setCursor(3, 4);
+    oled.print(RTC.temperature() / 4.0);
+    oled.print("^C");
+    rtc_timer = millis();
+  }
+
   if((currentMillis - lastChange >= MENU_TIMEOUT && oled_display) || lastChange == 0){
     Serial.println("oled display");
     current_menu = DEFAULT_MENU;

@@ -33,6 +33,8 @@ const unsigned int MAX_START_VOLUME = 3;
 const unsigned int MAX_VOLUME       = 48;
 const unsigned int MENU_TIMEOUT     = 5000;
 
+char* months[12] = {"JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
+
 struct config_t {
     int activeInput;
     int volumeLevel;
