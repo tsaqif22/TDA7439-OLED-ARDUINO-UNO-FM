@@ -99,7 +99,7 @@ void loop(){
   if(irrecv.decode(&results)){
     if(results.decode_type == NEC){
       process_ir(results.value);
-      //delay(50);
+      delay(50);
     }
     irrecv.resume(); // Receive the next value
   }
@@ -115,17 +115,23 @@ void loop(){
   if (b != ClickEncoder::Open) {
     switch (b) {
       case ClickEncoder::Pressed:
-          Serial.println("ClickEncoder:Pressed");
+      
         break;
 
       case ClickEncoder::Clicked:
           current_menu++;
           choose_menu();
-          Serial.println("ClickEncoder:Clicked");
         break;
       
       case ClickEncoder::DoubleClicked:
-          Serial.println("ClickEncoder::DoubleClicked");
+        current_menu = FM_FREQUENCY;
+        Radio.set_frequency(configuration.frequency);
+        for(int i = configuration.volumeLevel; i >= 0; i-- ){ equ.setVolume(i); delay(1); }
+        configuration.activeInput = FM_RADIO;
+        equ.setInput(configuration.activeInput);
+        for(int i = 0; i <= configuration.volumeLevel; i++ ){ equ.setVolume(i); delay(1); }
+        EEPROM_writeAnything(0, configuration);
+        lastChange = 0;
         break;
     }
   }    
@@ -231,6 +237,13 @@ void process_ir(unsigned long ir_command){
         current_menu++; choose_menu();
       break;
 
+    case CA_REWIND:
+      if(configuration.activeInput == FM_RADIO){
+        current_menu = FM_FREQUENCY;
+        process_encoder(-1);
+      }
+      break;
+
     case CA_PREVIOUS:
       configuration.activeInput = configuration.activeInput - 1;
       if(configuration.activeInput < 1) configuration.activeInput = MAX_INPUTS;
@@ -238,6 +251,13 @@ void process_ir(unsigned long ir_command){
       equ.setInput(configuration.activeInput);
       for(int i = 0; i <= configuration.volumeLevel; i++ ){ equ.setVolume(i); delay(5); }
       process_ir(CA_CANCEL);
+      break;
+
+    case CA_FORWARD:
+      if(configuration.activeInput == FM_RADIO){
+        current_menu = FM_FREQUENCY;
+        process_encoder(1);
+      }
       break;
 
     case CA_KEY_ONE:
@@ -298,6 +318,7 @@ void process_ir(unsigned long ir_command){
         oled.setCursor(5, 4);
         oled.print("SAVE #?");
         save_station = true;
+        oled_display = true;
       }
       break;
 
