@@ -138,7 +138,7 @@ void loop(){
 
   unsigned long currentMillis = millis();
 
-  if(currentMillis - rtc_timer >= 60000 || rtc_timer == 0){
+  if(currentMillis - rtc_timer >= 1000 || rtc_timer == 0){
     RTC.read(my_time);
 
     oled.setCursor(0, 4);
