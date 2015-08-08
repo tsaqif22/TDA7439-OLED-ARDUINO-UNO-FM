@@ -1,6 +1,6 @@
 
-#define DEBUG_LED       13
-#define INFRARED_PIN    11
+#define DEBUG_LED       5
+#define INFRARED_PIN    3
 
 #define VOLUME_LEVEL    0
 #define BASS_LEVEL      1

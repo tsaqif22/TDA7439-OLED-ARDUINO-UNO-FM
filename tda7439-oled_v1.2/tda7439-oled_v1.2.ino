@@ -36,7 +36,16 @@ unsigned char buf[5];
 SSD1306_text oled;
 
 void setup() {
-  pinMode(DEBUG_LED, OUTPUT); digitalWrite(DEBUG_LED, HIGH);
+  pinMode(DEBUG_LED, OUTPUT); 
+  digitalWrite(DEBUG_LED, HIGH);
+  delay(150);
+  digitalWrite(DEBUG_LED, LOW);
+  delay(150);
+  digitalWrite(DEBUG_LED, HIGH);
+  delay(150);
+  digitalWrite(DEBUG_LED, LOW);
+  delay(150);
+  digitalWrite(DEBUG_LED, HIGH);
   Serial.begin(9600);
 
   EEPROM_readAnything(0, configuration);
