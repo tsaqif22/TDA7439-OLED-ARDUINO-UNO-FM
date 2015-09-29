@@ -1,23 +1,23 @@
 
-#define DEBUG_LED       5
-#define INFRARED_PIN    3
+const unsigned int DEBUG_LED       = 5;
+const unsigned int INFRARED_PIN    = 3;
 
-#define VOLUME_LEVEL    0
-#define BASS_LEVEL      1
-#define MID_LEVEL       2
-#define TREBLE_LEVEL    3
-#define SELECT_INPUT    4
-#define FM_FREQUENCY    5
-#define INPUT_GAIN      6
-#define BRIGHTNESS      7
+const unsigned int VOLUME_LEVEL    = 1;
+const unsigned int BASS_LEVEL      = 2;
+const unsigned int MID_LEVEL       = 3;
+const unsigned int TREBLE_LEVEL    = 4;
+const unsigned int SELECT_INPUT    = 5;
+const unsigned int FM_FREQUENCY    = 6;
+const unsigned int INPUT_GAIN      = 7;
+const unsigned int BRIGHTNESS      = 8;
 
 const unsigned int ENCODER_CLK     = 0;
 const unsigned int ENCODER_DT      = 1;
 const unsigned int ENCODER_SW      = 2;
 const unsigned int ENCODER_STEPS   = 4;
 
-char* MenuItems[7] = {"VOL ", "BASS", "TONE", "TREB", "CHNL", "FM", "GAIN"};
-const unsigned int DEFAULT_MENU    = 0;
+char* MenuItems[9] = {"NA", "VOL ", "BASS", "TONE", "TREB", "CHNL", "FM", "GAIN", "LED"};
+const unsigned int DEFAULT_MENU    = 1;
 
 const unsigned int AUX_INPUT_ONE   = 1;
 const unsigned int AUX_INPUT_TWO   = 2;
@@ -26,7 +26,7 @@ const unsigned int FM_RADIO        = 4;
 
 char* InputChannels[5] = {"NA", "P1", "P2", "BT", "FM"};
 
-const unsigned int MAX_MENU_ITEMS  = 6;
+const unsigned int MAX_MENU_ITEMS  = 8;
 const unsigned int MAX_INPUTS      = 4;
 
 const unsigned int MAX_START_VOLUME = 3;
@@ -53,7 +53,7 @@ struct config_t {
     double station_7;
     double station_8;
     double station_9;
-    
+    int oled;
 } configuration;
 
 
@@ -64,7 +64,6 @@ const double RADIO_CITY       = 91.10;
 const double BIG_FM           = 92.70;
 const double RED_FM           = 93.50;
 const double IGNOU            = 105.60;
-
 
 #define CA_PAUSE          0x843501FE
 #define CA_PLAY_NEXT      0x843502FD

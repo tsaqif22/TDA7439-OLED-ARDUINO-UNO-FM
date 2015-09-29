@@ -9,19 +9,16 @@
 #define NEC
 #include <IRremote.h>
 #include <SSD1306_text.h>
-#include <DS3232RTC.h>
 #include "remote.h"
 
 ClickEncoder *encoder;
 int16_t encoder_last_value, encoder_current_value;
 
 unsigned long lastChange = 0;
-unsigned long rtc_timer = 0;
 unsigned int current_menu = DEFAULT_MENU;
-boolean mute = false;
+boolean eqmute = false;
 boolean save_station = false;
 unsigned long last_ir_command;
-tmElements_t my_time;
 
 #define encResDivider 100
 void timerIsr() { encoder->service(); }
@@ -32,30 +29,56 @@ decode_results results;
 TDA7439 equ;
 TEA5767 Radio;
 int search_mode = 0;
-unsigned char buf[5];
+unsigned char buf[10];
 SSD1306_text oled;
 
 void setup() {
   pinMode(DEBUG_LED, OUTPUT); 
   digitalWrite(DEBUG_LED, HIGH);
-  delay(150);
-  digitalWrite(DEBUG_LED, LOW);
-  delay(150);
-  digitalWrite(DEBUG_LED, HIGH);
-  delay(150);
-  digitalWrite(DEBUG_LED, LOW);
-  delay(150);
-  digitalWrite(DEBUG_LED, HIGH);
   Serial.begin(9600);
 
   EEPROM_readAnything(0, configuration);
+  encoder = new ClickEncoder(ENCODER_CLK, ENCODER_DT, ENCODER_SW, ENCODER_STEPS);
+  encoder->setAccelerationEnabled(false);
   
-  if(configuration.attLevel != 0){
+  if(digitalRead(ENCODER_SW) == LOW){
+    eq_init();
+  }
+  
+  Wire.begin();
+
+  Radio.init();
+  Radio.set_frequency(configuration.frequency);
+
+  oled.init(); oled.clear();
+  oled.setTextTransparent(false);
+  oled.sendCommand(SSD1306_SETCONTRAST);
+  oled.sendCommand(configuration.oled);
+
+  equ.setInput(configuration.activeInput);
+  equ.inputGain(configuration.gainLevel);
+  equ.setSnd(configuration.bassLevel, 1);
+  equ.setSnd(configuration.midLevel, 2);
+  equ.setSnd(configuration.trebLevel, 3);
+  equ.spkAtt(configuration.attLevel);
+  //configuration.volumeLevel = MAX_START_VOLUME;
+  for(byte i = 0; i <= configuration.volumeLevel; i++ ){ equ.setVolume(i); delay(6); }
+
+  irrecv.enableIRIn();
+
+  Timer1.initialize(1000);
+  Timer1.attachInterrupt(timerIsr); 
+  encoder_last_value = 0;
+  
+}
+
+void eq_init(){
+    Serial.println("init called");
     configuration.activeInput   = 4;
     configuration.volumeLevel   = 3;
-    configuration.bassLevel     = 2;
+    configuration.bassLevel     = 5;
     configuration.midLevel      = 1;
-    configuration.trebLevel     = 2;
+    configuration.trebLevel     = 3;
     configuration.attLevel      = 0;
     configuration.gainLevel     = 0;
     configuration.frequency     = VIVIDH_BHARATHI;
@@ -68,39 +91,12 @@ void setup() {
     configuration.station_7     = RAINBOW;
     configuration.station_8     = VIVIDH_BHARATHI;
     configuration.station_9     = VIVIDH_BHARATHI;
+    configuration.oled          = 93;
     EEPROM_writeAnything(0, configuration);  
-  }
-  
-  Wire.begin();
-
-  Radio.init();
-  if(configuration.activeInput == FM_RADIO){
-    Radio.set_frequency(configuration.frequency);
-    delay(100);
-  }
-
-  oled.init(); oled.clear();
-  oled.setTextTransparent(false);
-
-  equ.setInput(configuration.activeInput);
-  equ.inputGain(configuration.gainLevel);
-  equ.setSnd(configuration.bassLevel, 1);
-  equ.setSnd(configuration.midLevel, 2);
-  equ.setSnd(configuration.trebLevel, 3);
-  equ.spkAtt(configuration.attLevel);
-  for(byte i = 0; i <= constrain(configuration.volumeLevel, 0, MAX_START_VOLUME); i++ ){ equ.setVolume(i); delay(5); }
-
-  encoder = new ClickEncoder(ENCODER_CLK, ENCODER_DT, ENCODER_SW, ENCODER_STEPS);
-  encoder->setAccelerationEnabled(false);
-  irrecv.enableIRIn();
-
-  Timer1.initialize(1000);
-  Timer1.attachInterrupt(timerIsr); 
-  encoder_last_value = 0;
-  
 }
 
 boolean oled_display = true;
+unsigned int station_index = 0;
 
 void loop(){
   encoder_current_value += encoder->getValue();
@@ -124,61 +120,63 @@ void loop(){
   if (b != ClickEncoder::Open) {
     switch (b) {
       case ClickEncoder::Pressed:
-      
         break;
 
       case ClickEncoder::Clicked:
-          current_menu++;
-          choose_menu();
+
+          if(configuration.activeInput == FM_RADIO){
+            station_index = station_index + 1;
+            if(station_index > 7) station_index = 1;
+
+            if(station_index == 1) configuration.frequency = VIVIDH_BHARATHI;
+            if(station_index == 2) configuration.frequency = RAINBOW;
+            if(station_index == 3) configuration.frequency = MIRCHI;
+            if(station_index == 4) configuration.frequency = RADIO_CITY;
+            if(station_index == 5) configuration.frequency = BIG_FM;
+            if(station_index == 6) configuration.frequency = RED_FM;
+            if(station_index == 7) configuration.frequency = IGNOU;
+
+            current_menu = FM_FREQUENCY;
+            Radio.set_frequency(configuration.frequency);
+            for(int i = configuration.volumeLevel; i >= 0; i-- ){ equ.setVolume(i); delay(6); }
+            configuration.activeInput = FM_RADIO;
+            equ.setInput(configuration.activeInput);
+            for(int i = 0; i <= configuration.volumeLevel; i++ ){ equ.setVolume(i); delay(6); }
+            EEPROM_writeAnything(0, configuration);
+            lastChange = 0;
+          }else{
+            current_menu++;
+            choose_menu();
+          }  
         break;
       
       case ClickEncoder::DoubleClicked:
-        current_menu = FM_FREQUENCY;
-        Radio.set_frequency(configuration.frequency);
-        for(int i = configuration.volumeLevel; i >= 0; i-- ){ equ.setVolume(i); delay(1); }
-        configuration.activeInput = FM_RADIO;
-        equ.setInput(configuration.activeInput);
-        for(int i = 0; i <= configuration.volumeLevel; i++ ){ equ.setVolume(i); delay(1); }
-        EEPROM_writeAnything(0, configuration);
-        lastChange = 0;
+        if(configuration.activeInput != FM_RADIO){
+          current_menu = FM_FREQUENCY;
+          Radio.set_frequency(configuration.frequency);
+          for(int i = configuration.volumeLevel; i >= 0; i-- ){ equ.setVolume(i); delay(6); }
+          configuration.activeInput = FM_RADIO;
+          equ.setInput(configuration.activeInput);
+          for(int i = 0; i <= configuration.volumeLevel; i++ ){ equ.setVolume(i); delay(6); }
+          EEPROM_writeAnything(0, configuration);
+          lastChange = 0;
+        }else{
+          for(int i = configuration.volumeLevel; i >= 0; i-- ){ equ.setVolume(i); delay(6); }
+          configuration.activeInput = AUX_INPUT_ONE;
+          equ.setInput(configuration.activeInput);
+          for(int i = 0; i <= configuration.volumeLevel; i++ ){ equ.setVolume(i); delay(6); }
+          EEPROM_writeAnything(0, configuration);
+          lastChange = 0;
+        }
         break;
     }
   }    
 
   unsigned long currentMillis = millis();
 
-  if(currentMillis - rtc_timer >= 1000 || rtc_timer == 0){
-    RTC.read(my_time);
-
-    oled.setCursor(0, 4);
-    oled.setTextSize(2, 4);
-
-    char foo_date[2];
-    sprintf(foo_date, "%02d", my_time.Day);
-    oled.print(foo_date);
-    oled.setTextSize(1,2);
-    oled.setCursor(0, 39);
-    oled.print(months[my_time.Month-1]);
-    oled.setCursor(1,32);
-    oled.print(my_time.Year+1970);
-
-    char foo_time[5];
-    sprintf(foo_time, "%02d:%02d", my_time.Hour, my_time.Minute);
-    oled.setTextSize(2, 4);
-    oled.setCursor(0, 65);
-    oled.print(foo_time);
-
-    oled.setTextSize(1, 2);
-    oled.setCursor(3, 4);
-    oled.print(RTC.temperature() / 4.0);
-    oled.print("^C");
-    rtc_timer = millis();
-  }
-
   if((currentMillis - lastChange >= MENU_TIMEOUT && oled_display) || lastChange == 0){
-    Serial.println("oled display");
     current_menu = DEFAULT_MENU;
-    char dbuffer[6];
+    char dbuffer[10];
 
     sprintf(dbuffer, "%-4s %02d", InputChannels[configuration.activeInput],configuration.volumeLevel);
     oled.setTextSize(3,3);
@@ -207,7 +205,7 @@ void loop(){
         oled.print(configuration.frequency);
         oled.setCursor(7, 46);
       
-        unsigned char buf[5];
+        unsigned char buf[10];
         if (Radio.read_status(buf) == 1) {
           if(Radio.stereo(buf)){
               oled.print("STEREO");
@@ -232,7 +230,6 @@ void process_ir(unsigned long ir_command){
   if(ir_command != CA_REPEAT) last_ir_command = ir_command;
 
   switch(ir_command){
-
     case CA_PLAY_NEXT:
       configuration.activeInput = configuration.activeInput + 1;
       if(configuration.activeInput > MAX_INPUTS) configuration.activeInput = 1;
@@ -243,12 +240,13 @@ void process_ir(unsigned long ir_command){
       break;
 
     case CA_MENU:
-        current_menu++; choose_menu();
+        current_menu++; choose_menu();  
       break;
 
     case CA_REWIND:
       if(configuration.activeInput == FM_RADIO){
         current_menu = FM_FREQUENCY;
+        oled.setTextSize(3,3); oled.setCursor(5, 4); oled.print("       ");
         process_encoder(-1);
       }
       break;
@@ -265,6 +263,7 @@ void process_ir(unsigned long ir_command){
     case CA_FORWARD:
       if(configuration.activeInput == FM_RADIO){
         current_menu = FM_FREQUENCY;
+        oled.setTextSize(3,3); oled.setCursor(5, 4); oled.print("       ");
         process_encoder(1);
       }
       break;
@@ -294,22 +293,31 @@ void process_ir(unsigned long ir_command){
         EEPROM_writeAnything(0, configuration);
         lastChange = 0;
         oled_display = true;
+      }else{
+        if(ir_command == CA_KEY_ONE)    current_menu = VOLUME_LEVEL; choose_menu();
+        if(ir_command == CA_KEY_TWO)    current_menu = BASS_LEVEL; choose_menu();
+        if(ir_command == CA_KEY_THREE)  current_menu = MID_LEVEL; choose_menu();
+        if(ir_command == CA_KEY_FOUR)   current_menu = TREBLE_LEVEL; choose_menu();
+        if(ir_command == CA_KEY_FIVE)   current_menu = SELECT_INPUT; choose_menu();
+        if(ir_command == CA_KEY_SIX)    current_menu = FM_FREQUENCY; choose_menu();
+        if(ir_command == CA_KEY_SEVEN)  current_menu = INPUT_GAIN; choose_menu();
+        if(ir_command == CA_KEY_EIGHT)  current_menu = BRIGHTNESS; choose_menu();
       }
       break;
     
     case CA_MUTE:
-      if(mute){
-        for(int i = 0; i <= configuration.volumeLevel; i++ ){ equ.setVolume(i); delay(5); }
+      if(eqmute){
+        for(int i = 0; i <= configuration.volumeLevel; i++ ){ equ.setVolume(i); delay(6); }
         oled.setTextSize(1, 2);
         oled.setCursor(3, 99);
         oled.print("    ");
-        mute = false;
+        eqmute = false;
       }else{
-        for(int i = configuration.volumeLevel; i <= 0; i-- ){ equ.setVolume(i); delay(5); }
+        for(int i = configuration.volumeLevel; i >= 0; i-- ){ equ.setVolume(i); delay(6); }
         oled.setTextSize(1, 2);
         oled.setCursor(3, 99);
         oled.print("MUTE");
-        mute = true;
+        eqmute = true;
       }
       break;
 
@@ -337,11 +345,9 @@ void process_ir(unsigned long ir_command){
       break;
 
     case CA_ENTER:
-      Serial.println("CA_ENTER");
       break;
 
     case CA_SEARCH:
-      Serial.println("CA_SEARCH");
       break;
 
     case CA_REPEAT:
@@ -380,8 +386,7 @@ void choose_menu(){
   oled_display = true;
   if(configuration.activeInput != FM_RADIO && current_menu == FM_FREQUENCY) current_menu++;
   if(current_menu > MAX_MENU_ITEMS) current_menu = DEFAULT_MENU;
-  Serial.println(current_menu);
-  char dbuffer[6];
+  char dbuffer[10];
 
   switch(current_menu){
     case VOLUME_LEVEL:
@@ -405,8 +410,11 @@ void choose_menu(){
       break;
       
     case FM_FREQUENCY:
+      oled.setTextSize(3,3);
+      oled.setCursor(5, 4);
+      oled.print("       ");
       if (Radio.read_status(buf) == 1) {
-        char str_fm[5];
+        char str_fm[10];
         dtostrf(configuration.frequency, 5, 1, str_fm);
         sprintf(dbuffer, "%s%s",MenuItems[current_menu], str_fm);
       }else{
@@ -418,6 +426,10 @@ void choose_menu(){
       sprintf(dbuffer, "%s %02d", MenuItems[current_menu], configuration.gainLevel);
       break;
 
+    case BRIGHTNESS:
+      sprintf(dbuffer, "%s %03d", MenuItems[current_menu], configuration.oled);
+      break;
+
     default:
       sprintf(dbuffer, "%s", "ERROR!!");
   }
@@ -427,22 +439,21 @@ void choose_menu(){
   EEPROM_writeAnything(0, configuration);
 }
 
+
 void process_encoder(int displacement){
   lastChange = millis();
   oled_display = true;
-  
-  Serial.print("displacement "); Serial.println(displacement);
-  char dbuffer[6];
+  char dbuffer[10];
   
   switch(current_menu){
     case VOLUME_LEVEL:
       configuration.volumeLevel = constrain((configuration.volumeLevel + displacement), 0, MAX_VOLUME);
       equ.setVolume(configuration.volumeLevel);
-      if(mute){
+      if(eqmute){
         oled.setTextSize(1, 2);
         oled.setCursor(3, 99);
         oled.print("    ");
-        mute = false;
+        eqmute = false;
       }
       sprintf(dbuffer, "%s %02d", MenuItems[current_menu], configuration.volumeLevel);
       break;
@@ -469,9 +480,9 @@ void process_encoder(int displacement){
       configuration.activeInput = configuration.activeInput + displacement;
       if(configuration.activeInput < 1) configuration.activeInput = MAX_INPUTS;
       if(configuration.activeInput > MAX_INPUTS) configuration.activeInput = 1;
-      for(int i = configuration.volumeLevel; i >= 0; i-- ){ equ.setVolume(i); delay(1); }
+      for(int i = configuration.volumeLevel; i >= 0; i-- ){ equ.setVolume(i); delay(5); }
       equ.setInput(configuration.activeInput);
-      for(int i = 0; i <= configuration.volumeLevel; i++ ){ equ.setVolume(i); delay(1); }
+      for(int i = 0; i <= configuration.volumeLevel; i++ ){ equ.setVolume(i); delay(5); }
       sprintf(dbuffer, "%s %s", MenuItems[current_menu], InputChannels[configuration.activeInput]);
       break;
       
@@ -481,10 +492,9 @@ void process_encoder(int displacement){
       if(configuration.frequency < 88) configuration.frequency = 108;
       if(configuration.frequency > 108) configuration.frequency = 88;
       Radio.set_frequency(configuration.frequency);
-      Serial.println(configuration.frequency);
-      
+
       if (Radio.read_status(buf) == 1) {
-        char str_fm[5];
+        char str_fm[10];
         dtostrf(configuration.frequency, 5, 1, str_fm);
         sprintf(dbuffer, "%s%s", MenuItems[current_menu], str_fm);
       }else{
@@ -498,6 +508,13 @@ void process_encoder(int displacement){
       sprintf(dbuffer, "%s %02d", MenuItems[current_menu], configuration.gainLevel);
       break;
 
+    case BRIGHTNESS:
+      configuration.oled = constrain((configuration.oled + displacement), 1, 255);
+      oled.sendCommand(SSD1306_SETCONTRAST);
+      oled.sendCommand(configuration.oled);
+      sprintf(dbuffer, "%s %03d", MenuItems[current_menu], configuration.oled);
+      break;
+
     default:
       sprintf(dbuffer, "%s", "ERROR!!");
   }
@@ -507,6 +524,3 @@ void process_encoder(int displacement){
   
   EEPROM_writeAnything(0, configuration);
 }
-
-
-
