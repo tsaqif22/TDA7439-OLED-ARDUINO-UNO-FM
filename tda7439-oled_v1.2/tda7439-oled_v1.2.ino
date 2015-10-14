@@ -34,17 +34,20 @@ SSD1306_text oled;
 
 void setup() {
   pinMode(DEBUG_LED, OUTPUT); 
-  digitalWrite(DEBUG_LED, HIGH);
-  Serial.begin(9600);
 
   EEPROM_readAnything(0, configuration);
   encoder = new ClickEncoder(ENCODER_CLK, ENCODER_DT, ENCODER_SW, ENCODER_STEPS);
   encoder->setAccelerationEnabled(false);
   
   if(digitalRead(ENCODER_SW) == LOW){
+    for(int g=0; g<=10; g++){
+      digitalWrite(DEBUG_LED, !digitalRead(DEBUG_LED));
+      delay(500);
+    }
     eq_init();
   }
-  
+
+  digitalWrite(DEBUG_LED, HIGH);
   Wire.begin();
 
   Radio.init();
@@ -73,7 +76,6 @@ void setup() {
 }
 
 void eq_init(){
-    Serial.println("init called");
     configuration.activeInput   = 4;
     configuration.volumeLevel   = 3;
     configuration.bassLevel     = 5;
