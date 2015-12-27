@@ -58,6 +58,10 @@ void setup() {
   oled.sendCommand(SSD1306_SETCONTRAST);
   oled.sendCommand(configuration.oled);
 
+  oled.setCursor(0, 4);
+  oled.setTextSize(2, 2);
+  oled.print("TDA7439 EQ");
+
   equ.setInput(configuration.activeInput);
   equ.inputGain(configuration.gainLevel);
   equ.setSnd(configuration.bassLevel, 1);
